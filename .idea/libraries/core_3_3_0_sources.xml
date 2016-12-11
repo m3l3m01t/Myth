@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="core-3.3.0-sources">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/wear/libs/core-3.3.0-sources.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
