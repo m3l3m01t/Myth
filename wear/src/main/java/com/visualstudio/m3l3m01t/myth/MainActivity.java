@@ -15,6 +15,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.WriterException;
@@ -33,6 +34,7 @@ public class MainActivity extends WearableActivity {
             new SimpleDateFormat("HH:mm", Locale.US);
     private static final String KEY_ROW = "KEY_ROW";
     private static final String KEY_COL = "KEY_COL";
+    public static String mContentId = "29294117388747849490";
     private BoxInsetLayout mContainerView;
     private TextView mClockView;
 
@@ -44,7 +46,6 @@ public class MainActivity extends WearableActivity {
 
         mContainerView = (BoxInsetLayout) findViewById(R.id.container);
         mClockView = (TextView) findViewById(R.id.clock);
-
 
         GridViewPager pager = (GridViewPager) findViewById(R.id.pager);
         pager.setAdapter(new MyPagerAdapter(getFragmentManager()));
@@ -82,7 +83,7 @@ public class MainActivity extends WearableActivity {
         }
     }
 
-    public static abstract class MyFragment extends Fragment {
+    public static class MyFragment extends Fragment {
         private static Vector<Pair<Integer, Class<? extends MyFragment>>> mLayouts = new Vector<>();
 
         static {
@@ -91,7 +92,6 @@ public class MainActivity extends WearableActivity {
 //            mLayouts.addElement(new Pair(R.layout.fragment_content, FragmentContent.class));
         }
 
-        protected String mContentId = "TKR12345678";
         protected int mRow;
         protected int mCol;
 
@@ -142,6 +142,10 @@ public class MainActivity extends WearableActivity {
             return bitmap;
         }
 
+        protected String getContentId() {
+            return mContentId;
+        }
+
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
@@ -159,18 +163,17 @@ public class MainActivity extends WearableActivity {
             mCol = bundle.getInt(KEY_COL);
 
             if (mCol < mLayouts.size()) {
-                return inflater.inflate(mLayouts.get(mCol).first, container);
+                return inflater.inflate(mLayouts.get(mCol).first, null);
             }
             return null;
         }
 
-        protected Bitmap createBarCode(String s, BarcodeFormat format, int width, int height) {
+        protected Bitmap createBarCode(DisplayMetrics displayMetrics, String s, BarcodeFormat format, int width, int
+                height) {
             MultiFormatWriter writer = new MultiFormatWriter();
             try {
                 BitMatrix bitMatrix = writer.encode(s, format, width, height);
 
-                DisplayMetrics displayMetrics = new DisplayMetrics();
-                getActivity().getWindowManager().getDefaultDisplay().getRealMetrics(displayMetrics);
 
                 return toBitmap(displayMetrics, bitMatrix);
 

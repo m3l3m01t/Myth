@@ -2,9 +2,11 @@ package com.visualstudio.m3l3m01t.myth;
 
 import android.graphics.Bitmap;
 import android.os.Bundle;
+import android.util.DisplayMetrics;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
+
 import com.google.zxing.BarcodeFormat;
 
 /**
@@ -16,11 +18,18 @@ public class FragmentQRCode extends MainActivity.MyFragment {
 
         ImageView imageView = (ImageView) view.findViewById(R.id.imageView);
 
-        Bitmap bitmap = createBarCode(mContentId, BarcodeFormat.QR_CODE, imageView.getWidth(), imageView.getHeight());
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        getActivity().getWindowManager().getDefaultDisplay().getRealMetrics(displayMetrics);
 
+        int width = (int) displayMetrics.widthPixels / 6 * 5;
+        int height = (int) displayMetrics.heightPixels / 6 * 5;
+
+        Bitmap bitmap = createBarCode(displayMetrics, getContentId(), BarcodeFormat.QR_CODE, width, height);
+
+        imageView.setMaxWidth(width);
+        imageView.setMaxHeight(height);
         imageView.setImageBitmap(bitmap);
 
-        ((TextView) view.findViewById(R.id.textView)).setText(mContentId);
-
+        ((TextView) view.findViewById(R.id.textView)).setText(getContentId());
     }
 }
