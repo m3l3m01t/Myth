@@ -2,6 +2,7 @@ package com.visualstudio.m3l3m01t.myth;
 
 import android.app.Fragment;
 import android.app.FragmentManager;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -9,13 +10,13 @@ import android.support.wearable.activity.WearableActivity;
 import android.support.wearable.view.BoxInsetLayout;
 import android.support.wearable.view.FragmentGridPagerAdapter;
 import android.support.wearable.view.GridViewPager;
+import android.util.ArraySet;
 import android.util.DisplayMetrics;
 import android.util.Pair;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
-
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.WriterException;
@@ -25,6 +26,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Set;
 import java.util.Vector;
 
 
@@ -34,7 +36,8 @@ public class MainActivity extends WearableActivity {
             new SimpleDateFormat("HH:mm", Locale.US);
     private static final String KEY_ROW = "KEY_ROW";
     private static final String KEY_COL = "KEY_COL";
-    public static String mContentId = "29294117388747849490";
+    private static Set<String> mIdList = new ArraySet<String>();
+    //    public static String mContentId = "29294117388747849490";
     private BoxInsetLayout mContainerView;
     private TextView mClockView;
 
@@ -72,15 +75,22 @@ public class MainActivity extends WearableActivity {
     private void updateDisplay() {
         if (isAmbient()) {
             mContainerView.setBackgroundColor(getResources().getColor(android.R.color.black));
-//            mTextView.setTextColor(getResources().getColor(android.R.color.white));
             mClockView.setVisibility(View.VISIBLE);
 
             mClockView.setText(AMBIENT_DATE_FORMAT.format(new Date()));
         } else {
             mContainerView.setBackground(null);
-//            mTextView.setTextColor(getResources().getColor(android.R.color.black));
             mClockView.setVisibility(View.GONE);
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        SharedPreferences preference = getPreferences(MODE_PRIVATE);
+
+        mIdList = preference.getStringSet("ID_SET", mIdList);
     }
 
     public static class MyFragment extends Fragment {
@@ -100,13 +110,16 @@ public class MainActivity extends WearableActivity {
         }
 
         public static Fragment create(Bundle bundle, int row, int col) {
+            if (row >= mIdList.size()) {
+                return null;
+            }
             if (col >= mLayouts.size()) {
                 return null;
             }
 
             Class<? extends MyFragment> klazz = mLayouts.get(col).second;
 
-            MyFragment fragment = null;
+            MyFragment fragment;
             try {
                 fragment = klazz.getConstructor().newInstance();
 
@@ -134,7 +147,7 @@ public class MainActivity extends WearableActivity {
 
             for (int x = 0; x < width; x++) {
                 for (int y = 0; y < height; y++) {
-                    bitmap.setPixel(x, y, matrix.get(x, y) == true ? Color.BLACK : Color.WHITE);
+                    bitmap.setPixel(x, y, matrix.get(x, y) ? Color.BLACK : Color.WHITE);
                 }
             }
 
@@ -143,13 +156,12 @@ public class MainActivity extends WearableActivity {
         }
 
         protected String getContentId() {
-            return mContentId;
+            return mIdList.toArray(new String[0])[mRow];
         }
 
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
-
         }
 
 //        abstract public void onViewCreated(View view, Bundle savedInstanceState);
@@ -201,7 +213,7 @@ public class MainActivity extends WearableActivity {
 
         @Override
         public int getRowCount() {
-            return 1;
+            return mIdList.size();
         }
 
         @Override

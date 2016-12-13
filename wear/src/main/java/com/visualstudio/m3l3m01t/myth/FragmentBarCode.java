@@ -6,7 +6,6 @@ import android.util.DisplayMetrics;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
-
 import com.google.zxing.BarcodeFormat;
 
 /**
@@ -18,10 +17,10 @@ public class FragmentBarCode extends MainActivity.MyFragment {
         DisplayMetrics displayMetrics = new DisplayMetrics();
         getActivity().getWindowManager().getDefaultDisplay().getRealMetrics(displayMetrics);
 
-        int width = (int) displayMetrics.widthPixels / 6 * 5;
-        int height = (int) displayMetrics.heightPixels / 4;
+        int width = displayMetrics.widthPixels / 6 * 5;
+        int height = displayMetrics.heightPixels / 4;
 
-        Bitmap bitmap = createBarCode(displayMetrics, getContentId(), BarcodeFormat.CODABAR, width, height);
+        Bitmap bitmap = createBarCode(displayMetrics, getContentId(), BarcodeFormat.CODE_128, width, height);
 
         ImageView imageView = (ImageView) view.findViewById(R.id.imageView);
         imageView.setMaxWidth(width);
