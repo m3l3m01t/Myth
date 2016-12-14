@@ -14,42 +14,46 @@ import android.support.wearable.activity.WearableActivity;
 import android.support.wearable.view.BoxInsetLayout;
 import android.support.wearable.view.FragmentGridPagerAdapter;
 import android.support.wearable.view.GridViewPager;
-import android.util.ArraySet;
 import android.util.DisplayMetrics;
-import android.util.Pair;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.MultiFormatWriter;
-import com.google.zxing.WriterException;
 import com.google.zxing.common.BitMatrix;
 
-import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+import static com.visualstudio.m3l3m01t.myth.MainActivity.FragmentBarcode.KEY_BARCODE;
+import static com.visualstudio.m3l3m01t.myth.MainActivity.FragmentBarcode.KEY_BITMAP;
+
 
 public class MainActivity extends WearableActivity {
-
-    static final String KEY_ROW = "KEY_ROW";
-    static final String KEY_COL = "KEY_COL";
     private static final int SPEECH_REQUEST_CODE = 0;
     private static final SimpleDateFormat AMBIENT_DATE_FORMAT =
             new SimpleDateFormat("HH:mm", Locale.US);
     private final static String ACTION_REMOVE = "com.github.m3l3m01t.myth.remove";
     private final static String ACTION_ADD = "com.github.m3l3m01t.myth.add";
-    private static Set<String> mIdList = new ArraySet<String>();
-    private static Vector<Pair<Integer, Class<? extends MyFragment>>> mLayouts = new Vector<>();
+    protected static HashMap<BarcodeFormat, Integer> mBarcodeDimension = new HashMap<>();
 
     static {
-        mLayouts.addElement(new Pair(R.layout.fragment_qrcode, FragmentQRCode.class));
-        mLayouts.addElement(new Pair(R.layout.fragment_barcode, FragmentBarCode.class));
-//            mLayouts.addElement(new Pair(R.layout.fragment_content, FragmentContent.class));
+        mBarcodeDimension.put(BarcodeFormat.QR_CODE, 2);
+        mBarcodeDimension.put(BarcodeFormat.AZTEC, 2);
+        mBarcodeDimension.put(BarcodeFormat.DATA_MATRIX, 2);
+        mBarcodeDimension.put(BarcodeFormat.PDF_417, 2);
+
+        mBarcodeDimension.put(BarcodeFormat.CODE_128, 1);
+        mBarcodeDimension.put(BarcodeFormat.CODE_93, 1);
+        mBarcodeDimension.put(BarcodeFormat.CODE_39, 1);
+        mBarcodeDimension.put(BarcodeFormat.CODABAR, 1);
+        mBarcodeDimension.put(BarcodeFormat.ITF, 1);
     }
 
     GridViewPager mPager;
+    private HashMap<String, List<Bitmap>> mBarcodeHash = new HashMap<>();
     Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
@@ -62,52 +66,110 @@ public class MainActivity extends WearableActivity {
             }
         }
     };
+
     //    public static String mContentId = "29294117388747849490";
     private BoxInsetLayout mContainerView;
     private TextView mClockView;
+//
+//    public static Fragment create(Bundle bundle, int row, int col) {
+//        if (row > mIdList.size()) {
+//            return null;
+//        }
+//
+//        Class<? extends FragmentBarcode> klazz;
+//
+//        if (row == mIdList.size()) {
+//            klazz = FragmentAction.class;
+//        } else {
+//
+//            if (col >= mLayouts.size()) {
+//                return null;
+//            }
+//
+//            klazz = mLayouts.get(col).second;
+//        }
+//
+//
+//        try {
+//            FragmentBarcode fragment;
+//
+//            fragment = klazz.getConstructor().newInstance();
+//
+//            fragment.setArguments(bundle);
+//            return fragment;
+//        } catch (java.lang.InstantiationException e) {
+//            e.printStackTrace();
+//        } catch (IllegalAccessException e) {
+//            e.printStackTrace();
+//        } catch (InvocationTargetException e) {
+//            e.printStackTrace();
+//        } catch (NoSuchMethodException e) {
+//            e.printStackTrace();
+//        }
+//
+//        return null;
+//    }
 
-    public static Fragment create(Bundle bundle, int row, int col) {
-        if (row > mIdList.size()) {
+    public static Bitmap bitMatrixtoBitmap(DisplayMetrics metrics, BitMatrix matrix) {
+        int width = matrix.getWidth();
+        int height = matrix.getHeight();
+
+        Bitmap bitmap = Bitmap.createBitmap(metrics,
+                width, height, Bitmap.Config.ARGB_8888);
+
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                bitmap.setPixel(x, y, matrix.get(x, y) ? Color.BLACK : Color.WHITE);
+            }
+        }
+
+        return bitmap;
+    }
+
+    protected static Bitmap createBarcode(DisplayMetrics displayMetrics, String s, BarcodeFormat format, int width, int
+            height) {
+        MultiFormatWriter writer = new MultiFormatWriter();
+        try {
+            BitMatrix bitMatrix = writer.encode(s, format, width, height);
+
+            return bitMatrixtoBitmap(displayMetrics, bitMatrix);
+        } catch (Exception e) {
+            e.printStackTrace();
+
             return null;
         }
+    }
 
-        Class<? extends MyFragment> klazz;
+    protected static List<Bitmap> createBarcodes(DisplayMetrics displayMetrics, String barcode) {
+        List<Bitmap> bitmaps = new Vector<>();
 
-        if (row == mIdList.size()) {
-            klazz = FragmentAction.class;
-        } else {
+        for (Map.Entry<BarcodeFormat, Integer> entry :
+                mBarcodeDimension.entrySet()) {
+            int width = displayMetrics.widthPixels * 5 / 6;
+            int height;
 
-            if (col >= mLayouts.size()) {
-                return null;
+            if (entry.getValue() == 2) {
+                height = width;
+            } else {
+                height = width / 4;
             }
 
-            klazz = mLayouts.get(col).second;
+            Bitmap bitmap = createBarcode(displayMetrics, barcode, entry.getKey(), width, height);
+            if (bitmap != null)
+                bitmaps.add(bitmap);
         }
 
-
-        try {
-            MyFragment fragment;
-
-            fragment = klazz.getConstructor().newInstance();
-
-            fragment.setArguments(bundle);
-            return fragment;
-        } catch (java.lang.InstantiationException e) {
-            e.printStackTrace();
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        } catch (InvocationTargetException e) {
-            e.printStackTrace();
-        } catch (NoSuchMethodException e) {
-            e.printStackTrace();
-        }
-
-        return null;
+        return bitmaps;
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        SharedPreferences preference = getPreferences(MODE_PRIVATE);
+
+        Set<String> barcodes = preference.getStringSet("ID_SET", new HashSet<String>());
+
         setContentView(R.layout.activity_main);
         setAmbientEnabled();
 
@@ -115,7 +177,7 @@ public class MainActivity extends WearableActivity {
         mClockView = (TextView) findViewById(R.id.clock);
 
         mPager = (GridViewPager) findViewById(R.id.pager);
-        mPager.setAdapter(new MyPagerAdapter(getFragmentManager()));
+        mPager.setAdapter(new MyPagerAdapter(getFragmentManager(), barcodes.toArray(new String[0])));
     }
 
     @Override
@@ -136,6 +198,21 @@ public class MainActivity extends WearableActivity {
         super.onExitAmbient();
     }
 
+/*    BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equals(ACTION_ADD)) {
+                String item = intent.getStringExtra("ITEM");
+
+                add(item);
+            } else if (intent.getAction().equals(ACTION_REMOVE)) {
+                String item = intent.getStringExtra("ITEM");
+
+                remove(item);
+            }
+        }
+    };*/
+
     private void updateDisplay() {
         if (isAmbient()) {
             mContainerView.setBackgroundColor(getResources().getColor(android.R.color.black));
@@ -152,9 +229,6 @@ public class MainActivity extends WearableActivity {
     protected void onResume() {
         super.onResume();
 
-        SharedPreferences preference = getPreferences(MODE_PRIVATE);
-
-        mIdList = preference.getStringSet("ID_SET", mIdList);
 
 //        IntentFilter filter = new IntentFilter(ACTION_REMOVE);
 //
@@ -165,27 +239,10 @@ public class MainActivity extends WearableActivity {
     @Override
     protected void onPause() {
         super.onPause();
-//        unregisterReceiver(receiver);
-
 
         SharedPreferences preference = getPreferences(MODE_PRIVATE);
-        preference.edit().putStringSet("ID_SET", mIdList).commit();
+        preference.edit().putStringSet("ID_SET", mBarcodeHash.keySet()).commit();
     }
-
-/*    BroadcastReceiver receiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(ACTION_ADD)) {
-                String item = intent.getStringExtra("ITEM");
-
-                add(item);
-            } else if (intent.getAction().equals(ACTION_REMOVE)) {
-                String item = intent.getStringExtra("ITEM");
-
-                remove(item);
-            }
-        }
-    };*/
 
     public void sendMessage(int arg1, String id) {
         Message message = mHandler.obtainMessage();
@@ -200,51 +257,57 @@ public class MainActivity extends WearableActivity {
     }
 
     public void add(String spokenText) {
-        synchronized (mIdList) {
-            mIdList.add(spokenText);
-        }
+        if (mBarcodeHash.containsKey(spokenText))
+            return;
 
-        mPager.getAdapter().notifyDataSetChanged();
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getRealMetrics(displayMetrics);
+
+        List<Bitmap> bitmaps = createBarcodes(displayMetrics, spokenText);
+        if (bitmaps.size() > 0) {
+            mBarcodeHash.put(spokenText, bitmaps);
+            mPager.setAdapter(new MyPagerAdapter(getFragmentManager(), mBarcodeHash.keySet().toArray(new String[0])));
+        }
     }
 
     public void remove(String spokenText) {
-        synchronized (mIdList) {
-            mIdList.remove(spokenText);
-        }
-        mPager.getAdapter().notifyDataSetChanged();
+        if (!mBarcodeHash.containsKey(spokenText))
+            return;
+        mBarcodeHash.remove(spokenText);
+
+        mPager.setAdapter(new MyPagerAdapter(getFragmentManager(), mBarcodeHash.keySet().toArray(new String[0])));
     }
 
-    public static class MyFragment extends Fragment {
-        protected int mRow;
-        protected int mCol;
+    public static class FragmentBarcode extends Fragment {
+        protected static final String KEY_BARCODE = "KEY_BARCODE";
+        protected static final String KEY_BITMAP = "KEY_BITMAP";
+        private String barcode;
+        private Bitmap bitmap;
 
-        public MyFragment() {
-
-        }
-
-        public Bitmap toBitmap(DisplayMetrics metrics, BitMatrix matrix) {
-            int width = matrix.getWidth();
-            int height = matrix.getHeight();
-
-            Bitmap bitmap = Bitmap.createBitmap(metrics,
-                    width, height, Bitmap.Config.ARGB_8888);
-
-            for (int x = 0; x < width; x++) {
-                for (int y = 0; y < height; y++) {
-                    bitmap.setPixel(x, y, matrix.get(x, y) ? Color.BLACK : Color.WHITE);
-                }
-            }
-
-            return bitmap;
-        }
-
-        protected String getContentId() {
-            return mIdList.toArray(new String[0])[mRow];
+        public FragmentBarcode() {
+            super();
         }
 
         @Override
-        public void onCreate(Bundle savedInstanceState) {
-            super.onCreate(savedInstanceState);
+        public void onViewCreated(View view, Bundle savedInstanceState) {
+//            DisplayMetrics displayMetrics = new DisplayMetrics();
+//            getActivity().getWindowManager().getDefaultDisplay().getRealMetrics(displayMetrics);
+//
+//            int width = displayMetrics.widthPixels / 6 * 5;
+//            int height = displayMetrics.heightPixels / 4;
+
+            ImageView imageView = (ImageView) view.findViewById(R.id.imageView);
+
+            imageView.setImageBitmap(bitmap);
+            imageView.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override
+                public boolean onLongClick(View v) {
+                    ((MainActivity) getActivity()).sendMessage(2, barcode);
+                    return true;
+                }
+            });
+
+            ((TextView) view.findViewById(R.id.textView)).setText(barcode);
         }
 
         @Override
@@ -252,47 +315,20 @@ public class MainActivity extends WearableActivity {
             super.onCreateView(inflater, container, savedInstanceState);
 
             Bundle bundle = getArguments();
-            mRow = bundle.getInt(KEY_ROW);
-            mCol = bundle.getInt(KEY_COL);
+            barcode = bundle.getString(KEY_BARCODE);
+            bitmap = bundle.getParcelable(KEY_BITMAP);
 
-            if (mCol < mLayouts.size()) {
-                return inflater.inflate(mLayouts.get(mCol).first, null);
-            }
-            return null;
-        }
-
-        protected Bitmap createBarCode(DisplayMetrics displayMetrics, String s, BarcodeFormat format, int width, int
-                height) {
-            MultiFormatWriter writer = new MultiFormatWriter();
-            try {
-                BitMatrix bitMatrix = writer.encode(s, format, width, height);
-
-
-                return toBitmap(displayMetrics, bitMatrix);
-
-            } catch (WriterException e) {
-                e.printStackTrace();
-
-                return null;
-            } catch (IllegalArgumentException e) {
-                e.printStackTrace();
-
-                ((MainActivity) getActivity()).sendMessage(2, s);
-
-                return null;
-            }
+            return inflater.inflate(R.layout.fragment_barcode, null);
         }
     }
 
     /**
      * Created by jiff.shen on 16/12/13.
      */
-    public static class FragmentAction extends MyFragment {
+    public static class FragmentAction extends Fragment {
         @Override
         public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
             Bundle bundle = getArguments();
-            mRow = bundle.getInt(KEY_ROW);
-            mCol = bundle.getInt(KEY_COL);
 
             return inflater.inflate(R.layout.fragment_action, null);
         }
@@ -315,6 +351,8 @@ public class MainActivity extends WearableActivity {
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                     RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
+//            intent.putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, "en-US");
             // Start the activity, the intent will be populated with the speech text
             startActivityForResult(intent, SPEECH_REQUEST_CODE);
         }
@@ -327,39 +365,88 @@ public class MainActivity extends WearableActivity {
             if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK) {
                 List<String> results = data.getStringArrayListExtra(
                         RecognizerIntent.EXTRA_RESULTS);
-                String s = results.get(0);
+                for (String s : results) {
+//                String s = results.get(0);
 
-                ((MainActivity) getActivity()).sendMessage(1, s);
+                    ((MainActivity) getActivity()).sendMessage(1, s);
+                }
             }
         }
     }
 
     private class MyPagerAdapter extends FragmentGridPagerAdapter {
-        public MyPagerAdapter(FragmentManager fm) {
+        private String[] barcodes;
+
+        public MyPagerAdapter(FragmentManager fm, String[] barcodes) {
             super(fm);
+            this.barcodes = barcodes;
         }
 
         @Override
         public Fragment getFragment(int row, int col) {
-            Bundle bundle = new Bundle();
+            if (row > barcodes.length)
+                return null;
+            if (row == barcodes.length) {
+                if (col > 0)
+                    return null;
+                return new FragmentAction();
+            } else {
+                String barcode = barcodes[row];
+                if (!mBarcodeHash.containsKey(barcode)) {
+                    DisplayMetrics displayMetrics = new DisplayMetrics();
+                    getWindowManager().getDefaultDisplay().getRealMetrics(displayMetrics);
 
-            bundle.putInt(KEY_ROW, row);
-            bundle.putInt(KEY_COL, col);
-            return create(bundle, row, col);
+                    List<Bitmap> bitmaps = createBarcodes(displayMetrics, barcode);
+                    if (bitmaps != null && bitmaps.size() > 0)
+                        mBarcodeHash.put(barcode, bitmaps);
+                    else {
+                        return null;
+                    }
+                }
+                List<Bitmap> bitmaps = mBarcodeHash.get(barcode);
+                if (col >= bitmaps.size()) {
+                    return null;
+                } else {
+                    Fragment fragment = new FragmentBarcode();
+                    Bundle bundle = new Bundle();
+
+                    bundle.putString(KEY_BARCODE, barcode);
+                    bundle.putParcelable(KEY_BITMAP, bitmaps.get(col));
+                    fragment.setArguments(bundle);
+
+                    return fragment;
+                }
+            }
         }
 
         @Override
         public int getRowCount() {
-            return mIdList.size() + 1;
+            return barcodes.length + 1;
         }
 
         @Override
         public int getColumnCount(int row) {
-            if (row < mIdList.size())
-                return 2;
-            else
+            if (row < barcodes.length) {
+                String barcode = barcodes[row];
+                if (barcode == null)
+                    return 0;
+                if (!mBarcodeHash.containsKey(barcode) || mBarcodeHash.get(barcode) == null) {
+                    DisplayMetrics displayMetrics = new DisplayMetrics();
+                    getWindowManager().getDefaultDisplay().getRealMetrics(displayMetrics);
+                    List<Bitmap> bitmaps = createBarcodes(displayMetrics, barcode);
+                    if (bitmaps != null && bitmaps.size() > 0)
+                        mBarcodeHash.put(barcode, bitmaps);
+                    else {
+                        return 0;
+                    }
+                }
+
+                return mBarcodeHash.get(barcode).size();
+            } else if (row == barcodes.length) {
                 return 1;
+            } else {
+                return 0;
+            }
         }
     }
-
 }
