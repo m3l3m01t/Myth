@@ -6,7 +6,6 @@ import android.util.DisplayMetrics;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
-
 import com.google.zxing.BarcodeFormat;
 
 /**
@@ -21,8 +20,8 @@ public class FragmentQRCode extends MainActivity.MyFragment {
         DisplayMetrics displayMetrics = new DisplayMetrics();
         getActivity().getWindowManager().getDefaultDisplay().getRealMetrics(displayMetrics);
 
-        int width = (int) displayMetrics.widthPixels / 6 * 5;
-        int height = (int) displayMetrics.heightPixels / 6 * 5;
+        int width = displayMetrics.widthPixels / 6 * 5;
+        int height = displayMetrics.heightPixels / 6 * 5;
 
         Bitmap bitmap = createBarCode(displayMetrics, getContentId(), BarcodeFormat.QR_CODE, width, height);
 

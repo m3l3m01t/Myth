@@ -2,10 +2,14 @@ package com.visualstudio.m3l3m01t.myth;
 
 import android.app.Fragment;
 import android.app.FragmentManager;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
+import android.speech.RecognizerIntent;
 import android.support.wearable.activity.WearableActivity;
 import android.support.wearable.view.BoxInsetLayout;
 import android.support.wearable.view.FragmentGridPagerAdapter;
@@ -24,22 +28,82 @@ import com.google.zxing.common.BitMatrix;
 
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-import java.util.Set;
-import java.util.Vector;
+import java.util.*;
 
 
 public class MainActivity extends WearableActivity {
 
+    static final String KEY_ROW = "KEY_ROW";
+    static final String KEY_COL = "KEY_COL";
+    private static final int SPEECH_REQUEST_CODE = 0;
     private static final SimpleDateFormat AMBIENT_DATE_FORMAT =
             new SimpleDateFormat("HH:mm", Locale.US);
-    private static final String KEY_ROW = "KEY_ROW";
-    private static final String KEY_COL = "KEY_COL";
+    private final static String ACTION_REMOVE = "com.github.m3l3m01t.myth.remove";
+    private final static String ACTION_ADD = "com.github.m3l3m01t.myth.add";
     private static Set<String> mIdList = new ArraySet<String>();
+    private static Vector<Pair<Integer, Class<? extends MyFragment>>> mLayouts = new Vector<>();
+
+    static {
+        mLayouts.addElement(new Pair(R.layout.fragment_qrcode, FragmentQRCode.class));
+        mLayouts.addElement(new Pair(R.layout.fragment_barcode, FragmentBarCode.class));
+//            mLayouts.addElement(new Pair(R.layout.fragment_content, FragmentContent.class));
+    }
+
+    GridViewPager mPager;
+    Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+
+            if (msg.arg1 == 1) {
+                add(msg.getData().getString("ID"));
+            } else if (msg.arg1 == 2) {
+                remove(msg.getData().getString("ID"));
+            }
+        }
+    };
     //    public static String mContentId = "29294117388747849490";
     private BoxInsetLayout mContainerView;
     private TextView mClockView;
+
+    public static Fragment create(Bundle bundle, int row, int col) {
+        if (row > mIdList.size()) {
+            return null;
+        }
+
+        Class<? extends MyFragment> klazz;
+
+        if (row == mIdList.size()) {
+            klazz = FragmentAction.class;
+        } else {
+
+            if (col >= mLayouts.size()) {
+                return null;
+            }
+
+            klazz = mLayouts.get(col).second;
+        }
+
+
+        try {
+            MyFragment fragment;
+
+            fragment = klazz.getConstructor().newInstance();
+
+            fragment.setArguments(bundle);
+            return fragment;
+        } catch (java.lang.InstantiationException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,8 +114,8 @@ public class MainActivity extends WearableActivity {
         mContainerView = (BoxInsetLayout) findViewById(R.id.container);
         mClockView = (TextView) findViewById(R.id.clock);
 
-        GridViewPager pager = (GridViewPager) findViewById(R.id.pager);
-        pager.setAdapter(new MyPagerAdapter(getFragmentManager()));
+        mPager = (GridViewPager) findViewById(R.id.pager);
+        mPager.setAdapter(new MyPagerAdapter(getFragmentManager()));
     }
 
     @Override
@@ -91,17 +155,66 @@ public class MainActivity extends WearableActivity {
         SharedPreferences preference = getPreferences(MODE_PRIVATE);
 
         mIdList = preference.getStringSet("ID_SET", mIdList);
+
+//        IntentFilter filter = new IntentFilter(ACTION_REMOVE);
+//
+//        filter.addAction(ACTION_ADD);
+//        registerReceiver(receiver, filter);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+//        unregisterReceiver(receiver);
+
+
+        SharedPreferences preference = getPreferences(MODE_PRIVATE);
+        preference.edit().putStringSet("ID_SET", mIdList).commit();
+    }
+
+/*    BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equals(ACTION_ADD)) {
+                String item = intent.getStringExtra("ITEM");
+
+                add(item);
+            } else if (intent.getAction().equals(ACTION_REMOVE)) {
+                String item = intent.getStringExtra("ITEM");
+
+                remove(item);
+            }
+        }
+    };*/
+
+    public void sendMessage(int arg1, String id) {
+        Message message = mHandler.obtainMessage();
+
+        message.arg1 = arg1;
+
+        Bundle bundle = new Bundle();
+
+        bundle.putString("ID", id);
+        message.setData(bundle);
+        message.sendToTarget();
+    }
+
+    public void add(String spokenText) {
+        synchronized (mIdList) {
+            mIdList.add(spokenText);
+        }
+
+        mPager.getAdapter().notifyDataSetChanged();
+    }
+
+    public void remove(String spokenText) {
+        synchronized (mIdList) {
+            mIdList.remove(spokenText);
+        }
+        mPager.getAdapter().notifyDataSetChanged();
     }
 
     public static class MyFragment extends Fragment {
-        private static Vector<Pair<Integer, Class<? extends MyFragment>>> mLayouts = new Vector<>();
-
-        static {
-            mLayouts.addElement(new Pair(R.layout.fragment_qrcode, FragmentQRCode.class));
-            mLayouts.addElement(new Pair(R.layout.fragment_barcode, FragmentBarCode.class));
-//            mLayouts.addElement(new Pair(R.layout.fragment_content, FragmentContent.class));
-        }
-
         protected int mRow;
         protected int mCol;
 
@@ -109,36 +222,7 @@ public class MainActivity extends WearableActivity {
 
         }
 
-        public static Fragment create(Bundle bundle, int row, int col) {
-            if (row >= mIdList.size()) {
-                return null;
-            }
-            if (col >= mLayouts.size()) {
-                return null;
-            }
-
-            Class<? extends MyFragment> klazz = mLayouts.get(col).second;
-
-            MyFragment fragment;
-            try {
-                fragment = klazz.getConstructor().newInstance();
-
-                fragment.setArguments(bundle);
-                return fragment;
-            } catch (java.lang.InstantiationException e) {
-                e.printStackTrace();
-            } catch (IllegalAccessException e) {
-                e.printStackTrace();
-            } catch (InvocationTargetException e) {
-                e.printStackTrace();
-            } catch (NoSuchMethodException e) {
-                e.printStackTrace();
-            }
-
-            return null;
-        }
-
-        public static Bitmap toBitmap(DisplayMetrics metrics, BitMatrix matrix) {
+        public Bitmap toBitmap(DisplayMetrics metrics, BitMatrix matrix) {
             int width = matrix.getWidth();
             int height = matrix.getHeight();
 
@@ -151,7 +235,6 @@ public class MainActivity extends WearableActivity {
                 }
             }
 
-
             return bitmap;
         }
 
@@ -163,8 +246,6 @@ public class MainActivity extends WearableActivity {
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
         }
-
-//        abstract public void onViewCreated(View view, Bundle savedInstanceState);
 
         @Override
         public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -193,6 +274,62 @@ public class MainActivity extends WearableActivity {
                 e.printStackTrace();
 
                 return null;
+            } catch (IllegalArgumentException e) {
+                e.printStackTrace();
+
+                ((MainActivity) getActivity()).sendMessage(2, s);
+
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Created by jiff.shen on 16/12/13.
+     */
+    public static class FragmentAction extends MyFragment {
+        @Override
+        public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+            Bundle bundle = getArguments();
+            mRow = bundle.getInt(KEY_ROW);
+            mCol = bundle.getInt(KEY_COL);
+
+            return inflater.inflate(R.layout.fragment_action, null);
+        }
+
+        @Override
+        public void onViewCreated(View view, Bundle savedInstanceState) {
+            super.onViewCreated(view, savedInstanceState);
+
+            View imageView = view.findViewById(R.id.imageButton);
+            imageView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    displaySpeechRecognizer();
+                }
+            });
+        }
+
+        // Create an intent that can start the Speech Recognizer activity
+        void displaySpeechRecognizer() {
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            // Start the activity, the intent will be populated with the speech text
+            startActivityForResult(intent, SPEECH_REQUEST_CODE);
+        }
+
+        @Override
+        public void onActivityResult(int requestCode, int resultCode, Intent data) {
+            super.onActivityResult(requestCode, resultCode, data);
+            if (resultCode == RESULT_CANCELED)
+                return;
+            if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK) {
+                List<String> results = data.getStringArrayListExtra(
+                        RecognizerIntent.EXTRA_RESULTS);
+                String s = results.get(0);
+
+                ((MainActivity) getActivity()).sendMessage(1, s);
             }
         }
     }
@@ -208,17 +345,21 @@ public class MainActivity extends WearableActivity {
 
             bundle.putInt(KEY_ROW, row);
             bundle.putInt(KEY_COL, col);
-            return MyFragment.create(bundle, row, col);
+            return create(bundle, row, col);
         }
 
         @Override
         public int getRowCount() {
-            return mIdList.size();
+            return mIdList.size() + 1;
         }
 
         @Override
         public int getColumnCount(int row) {
-            return 2;
+            if (row < mIdList.size())
+                return 2;
+            else
+                return 1;
         }
     }
+
 }
