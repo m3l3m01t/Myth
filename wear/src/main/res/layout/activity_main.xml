@@ -1,45 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <android.support.wearable.view.BoxInsetLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/container"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context="com.visualstudio.m3l3m01t.myth.MainActivity"
-    tools:deviceIds="wear">
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context="com.visualstudio.m3l3m01t.myth.MainActivity"
+        tools:deviceIds="wear" android:background="@color/light_grey">
 
     <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_margin="10dp">
+            android:layout_margin="10dp" android:background="@color/light_grey">
 
         <android.support.wearable.view.GridViewPager
-            android:id="@+id/pager"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_alignParentTop="true"
-            android:layout_centerInParent="true"
-        />
-
-        <android.support.wearable.view.DotsPageIndicator
-            android:id="@+id/pageIndicator"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_below="@+id/pager"
-            android:layout_gravity="center"
-            android:minHeight="5dp"/>
+                android:id="@+id/pager"
+                android:layout_height="match_parent"
+                android:layout_alignParentTop="true"
+                android:layout_centerInParent="true"
+                android:layout_above="@+id/pageIndicator" android:layout_width="match_parent"/>
 
         <TextView
-            android:id="@+id/clock"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"
-            android:layout_alignParentEnd="false"
-            android:layout_alignParentLeft="true"
-            android:layout_gravity="bottom|start"
-            android:textColor="@android:color/white"
-            app:layout_box="all"/>
+                android:id="@+id/clock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/primary_text_light"
+                tools:text="19:00:00" android:layout_gravity="center_horizontal" app:layout_box="all"
+                android:layout_alignParentBottom="true" android:layout_centerHorizontal="true"/>
+        <android.support.wearable.view.DotsPageIndicator
+                android:id="@+id/pageIndicator"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:minHeight="5dp" android:layout_above="@+id/clock" android:layout_centerHorizontal="true"/>
     </RelativeLayout>
 
 </android.support.wearable.view.BoxInsetLayout>

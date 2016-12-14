@@ -42,14 +42,14 @@ public class MainActivity extends WearableActivity {
     static {
         mBarcodeDimension.put(BarcodeFormat.QR_CODE, 2);
         mBarcodeDimension.put(BarcodeFormat.AZTEC, 2);
-        mBarcodeDimension.put(BarcodeFormat.DATA_MATRIX, 2);
+//        mBarcodeDimension.put(BarcodeFormat.DATA_MATRIX, 2);
         mBarcodeDimension.put(BarcodeFormat.PDF_417, 2);
 
         mBarcodeDimension.put(BarcodeFormat.CODE_128, 1);
         mBarcodeDimension.put(BarcodeFormat.CODE_93, 1);
         mBarcodeDimension.put(BarcodeFormat.CODE_39, 1);
-        mBarcodeDimension.put(BarcodeFormat.CODABAR, 1);
-        mBarcodeDimension.put(BarcodeFormat.ITF, 1);
+//        mBarcodeDimension.put(BarcodeFormat.CODABAR, 1);
+//        mBarcodeDimension.put(BarcodeFormat.ITF, 1);
     }
 
     GridViewPager mPager;
@@ -115,11 +115,11 @@ public class MainActivity extends WearableActivity {
         int height = matrix.getHeight();
 
         Bitmap bitmap = Bitmap.createBitmap(metrics,
-                width, height, Bitmap.Config.ARGB_8888);
+                width, height, Bitmap.Config.ARGB_4444);
 
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
-                bitmap.setPixel(x, y, matrix.get(x, y) ? Color.BLACK : Color.WHITE);
+                bitmap.setPixel(x, y, matrix.get(x, y) ? Color.BLACK : Color.LTGRAY);
             }
         }
 
@@ -145,13 +145,17 @@ public class MainActivity extends WearableActivity {
 
         for (Map.Entry<BarcodeFormat, Integer> entry :
                 mBarcodeDimension.entrySet()) {
-            int width = displayMetrics.widthPixels * 5 / 6;
+            int width;
+
             int height;
 
             if (entry.getValue() == 2) {
+                width = (int) (displayMetrics.xdpi * 5 / 6);
                 height = width;
             } else {
-                height = width / 4;
+                width = (int) (displayMetrics.xdpi * 5 / 6);
+
+                height = width / 3;
             }
 
             Bitmap bitmap = createBarcode(displayMetrics, barcode, entry.getKey(), width, height);
@@ -290,15 +294,13 @@ public class MainActivity extends WearableActivity {
 
         @Override
         public void onViewCreated(View view, Bundle savedInstanceState) {
-//            DisplayMetrics displayMetrics = new DisplayMetrics();
-//            getActivity().getWindowManager().getDefaultDisplay().getRealMetrics(displayMetrics);
-//
-//            int width = displayMetrics.widthPixels / 6 * 5;
-//            int height = displayMetrics.heightPixels / 4;
-
             ImageView imageView = (ImageView) view.findViewById(R.id.imageView);
 
             imageView.setImageBitmap(bitmap);
+            imageView.setMaxHeight(bitmap.getHeight());
+            imageView.setMaxWidth(bitmap.getWidth());
+            imageView.setScaleType(ImageView.ScaleType.CENTER);
+
             imageView.setOnLongClickListener(new View.OnLongClickListener() {
                 @Override
                 public boolean onLongClick(View v) {
