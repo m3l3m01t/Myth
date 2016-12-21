@@ -16,6 +16,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.provider.MediaStore;
 import android.speech.RecognizerIntent;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.wearable.activity.WearableActivity;
@@ -28,6 +29,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.MultiFormatWriter;
@@ -35,7 +37,14 @@ import com.google.zxing.common.BitMatrix;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.Vector;
 
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
 import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
@@ -47,21 +56,17 @@ public class MainActivity extends WearableActivity {
     private static final int SPEECH_REQUEST_CODE = 0;
     private static final SimpleDateFormat AMBIENT_DATE_FORMAT =
             new SimpleDateFormat("HH:mm", Locale.US);
-    private final static String ACTION_REMOVE = "com.github.m3l3m01t.myth.remove";
-    private final static String ACTION_ADD = "com.github.m3l3m01t.myth.add";
+
     protected static HashMap<BarcodeFormat, Integer> mBarcodeDimension = new HashMap<>();
 
     static {
         mBarcodeDimension.put(BarcodeFormat.QR_CODE, 2);
         mBarcodeDimension.put(BarcodeFormat.AZTEC, 2);
-//        mBarcodeDimension.put(BarcodeFormat.DATA_MATRIX, 2);
         mBarcodeDimension.put(BarcodeFormat.PDF_417, 2);
 
         mBarcodeDimension.put(BarcodeFormat.CODE_128, 1);
         mBarcodeDimension.put(BarcodeFormat.CODE_93, 1);
         mBarcodeDimension.put(BarcodeFormat.CODE_39, 1);
-//        mBarcodeDimension.put(BarcodeFormat.CODABAR, 1);
-//        mBarcodeDimension.put(BarcodeFormat.ITF, 1);
     }
 
     GridViewPager mPager;
@@ -79,48 +84,9 @@ public class MainActivity extends WearableActivity {
             }
         }
     };
-    //    public static String mContentId = "29294117388747849490";
     private BoxInsetLayout mContainerView;
-//
-//    public static Fragment create(Bundle bundle, int row, int col) {
-//        if (row > mIdList.size()) {
-//            return null;
-//        }
-//
-//        Class<? extends FragmentBarcode> klazz;
-//
-//        if (row == mIdList.size()) {
-//            klazz = FragmentAction.class;
-//        } else {
-//
-//            if (col >= mLayouts.size()) {
-//                return null;
-//            }
-//
-//            klazz = mLayouts.get(col).second;
-//        }
-//
-//
-//        try {
-//            FragmentBarcode fragment;
-//
-//            fragment = klazz.getConstructor().newInstance();
-//
-//            fragment.setArguments(bundle);
-//            return fragment;
-//        } catch (java.lang.InstantiationException e) {
-//            e.printStackTrace();
-//        } catch (IllegalAccessException e) {
-//            e.printStackTrace();
-//        } catch (InvocationTargetException e) {
-//            e.printStackTrace();
-//        } catch (NoSuchMethodException e) {
-//            e.printStackTrace();
-//        }
-//
-//        return null;
-//    }
-private TextView mClockView;
+
+    private TextView mClockView;
 
     public static Bitmap bitMatrixtoBitmap(DisplayMetrics metrics, BitMatrix matrix) {
         int[] rect = matrix.getEnclosingRectangle();
@@ -135,8 +101,8 @@ private TextView mClockView;
             for (int y = 0; y < height; y++) {
                 bitmap.setPixel(x, y,
                         matrix.get(x + rect[0], y + rect[1]) ?
-                                Color.argb(0xff, 0x10, 0x10, 0x10) :
-                                Color.argb(0, 0xff, 0xff, 0xff));
+                                Color.BLACK :
+                                Color.WHITE);
             }
         }
 
@@ -153,22 +119,12 @@ private TextView mClockView;
 
             BitMatrix bitMatrix = writer.encode(s, format, width, height, hints);
 
-            Bitmap bitmap = bitMatrixtoBitmap(displayMetrics, bitMatrix);
-
-            return bitmap;
+            return bitMatrixtoBitmap(displayMetrics, bitMatrix);
         } catch (Exception e) {
             e.printStackTrace();
 
             return null;
         }
-    }
-
-    private static String getString(byte[] b) {
-        StringBuffer sb = new StringBuffer();
-        for (int i = 0; i < b.length; i++) {
-            sb.append(b[i]);
-        }
-        return sb.toString();
     }
 
     protected List<Bitmap> createBarcodes(DisplayMetrics displayMetrics, String barcode) {
@@ -184,14 +140,16 @@ private TextView mClockView;
             if (PackageManager.PERMISSION_GRANTED == permissionCheck) {
                 String url = getPreferences(MODE_PRIVATE).getString(name, null);
                 if (url != null) {
+                    Bitmap bitmap = null;
                     try {
-                        Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), Uri.parse(url));
-                        bitmaps.add(bitmap);
+                        bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), Uri.parse(url));
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-
-                    continue;
+                    if (bitmap != null) {
+                        bitmaps.add(bitmap);
+                        continue;
+                    }
                 }
             }
 
@@ -199,8 +157,7 @@ private TextView mClockView;
                 int width, height;
 
                 if (entry.getValue() == 2) {
-                    width = (int) (displayMetrics.xdpi * 5 / 6);
-                    height = width;
+                    height = width = (int) (displayMetrics.xdpi * 5 / 6);
                 } else {
                     width = (int) (displayMetrics.xdpi * 5 / 6);
 
@@ -211,12 +168,14 @@ private TextView mClockView;
                 if (bitmap != null) {
                     bitmaps.add(bitmap);
 
-                    if (ContextCompat.checkSelfPermission(this, WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                    if (ContextCompat.checkSelfPermission(this, WRITE_EXTERNAL_STORAGE) ==
+                            PackageManager
+                                    .PERMISSION_GRANTED) {
                         String url = MediaStore.Images.Media.insertImage(getContentResolver(), bitmap,
                                 name, barcode);
 
                         if (url != null) {
-                            getPreferences(MODE_PRIVATE).edit().putString(name, url).commit();
+                            getPreferences(MODE_PRIVATE).edit().putString(name, url).apply();
                         }
                     }
                 }
@@ -237,7 +196,6 @@ private TextView mClockView;
     protected void onResume() {
         super.onResume();
 
-
         SharedPreferences preference = getPreferences(MODE_PRIVATE);
 
         Set<String> barcodes = preference.getStringSet("ID_SET", new HashSet<String>());
@@ -247,7 +205,6 @@ private TextView mClockView;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
 
         setContentView(R.layout.activity_main);
         setAmbientEnabled();
@@ -262,7 +219,7 @@ private TextView mClockView;
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
         for (int i = 0; i < permissions.length; i++) {
@@ -303,7 +260,6 @@ private TextView mClockView;
             mClockView.setText(AMBIENT_DATE_FORMAT.format(new Date()));
             mPager.invalidate();
         } else {
-//            mContainerView.setBackground(null);
             mContainerView.setBackgroundColor(getResources().getColor(android.R.color.black));
             mClockView.setVisibility(View.GONE);
             mPager.invalidate();
@@ -335,7 +291,7 @@ private TextView mClockView;
             mPager.setAdapter(new MyPagerAdapter(getFragmentManager(), mBarcodeHash.keySet().toArray(new String[0])));
 
             SharedPreferences preference = getPreferences(MODE_PRIVATE);
-            preference.edit().putStringSet("ID_SET", mBarcodeHash.keySet()).commit();
+            preference.edit().putStringSet("ID_SET", mBarcodeHash.keySet()).apply();
         }
     }
 
@@ -346,7 +302,7 @@ private TextView mClockView;
 
         mPager.setAdapter(new MyPagerAdapter(getFragmentManager(), mBarcodeHash.keySet().toArray(new String[0])));
         SharedPreferences preference = getPreferences(MODE_PRIVATE);
-        preference.edit().putStringSet("ID_SET", mBarcodeHash.keySet()).commit();
+        preference.edit().putStringSet("ID_SET", mBarcodeHash.keySet()).apply();
     }
 
     public static class FragmentBarcode extends Fragment {
@@ -411,8 +367,6 @@ private TextView mClockView;
     public static class FragmentAction extends Fragment {
         @Override
         public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-            Bundle bundle = getArguments();
-
             return inflater.inflate(R.layout.fragment_action, null);
         }
 
@@ -420,7 +374,7 @@ private TextView mClockView;
         public void onViewCreated(View view, Bundle savedInstanceState) {
             super.onViewCreated(view, savedInstanceState);
 
-            View imageView = view.findViewById(R.id.imageButton);
+            View imageView = view.findViewById(R.id.icon_add);
             imageView.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -450,7 +404,7 @@ private TextView mClockView;
             super.onActivityResult(requestCode, resultCode, data);
             if (resultCode != RESULT_OK)
                 return;
-            if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK) {
+            if (requestCode == SPEECH_REQUEST_CODE) {
                 List<String> results = data.getStringArrayListExtra(
                         RecognizerIntent.EXTRA_RESULTS);
                 final String s = results.get(0);
@@ -480,7 +434,7 @@ private TextView mClockView;
         }
     }
 
-    private class MyPagerAdapter extends FragmentGridPagerAdapter {
+    protected class MyPagerAdapter extends FragmentGridPagerAdapter {
         private String[] barcodes;
 
         public MyPagerAdapter(FragmentManager fm, String[] barcodes) {

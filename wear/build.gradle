@@ -3,7 +3,7 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 24
-    buildToolsVersion "25.0.0"
+    buildToolsVersion '25.0.1'
 
     defaultConfig {
         applicationId "com.visualstudio.m3l3m01t.myth"
@@ -25,4 +25,5 @@ dependencies {
     compile 'com.google.android.support:wearable:+'
     compile 'com.google.android.gms:play-services-wearable:+'
     provided 'com.google.android.wearable:wearable:1.0.0'
+    compile 'com.android.support:support-compat:24.2.1'
 }
