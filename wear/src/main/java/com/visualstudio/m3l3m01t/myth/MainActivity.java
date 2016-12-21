@@ -1,15 +1,23 @@
 package com.visualstudio.m3l3m01t.myth;
 
+import android.app.AlertDialog;
 import android.app.Fragment;
 import android.app.FragmentManager;
+import android.content.DialogInterface;
+import android.content.DialogInterface.OnClickListener;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.MediaStore;
 import android.speech.RecognizerIntent;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.wearable.activity.WearableActivity;
 import android.support.wearable.view.BoxInsetLayout;
 import android.support.wearable.view.FragmentGridPagerAdapter;
@@ -21,12 +29,16 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 import com.google.zxing.BarcodeFormat;
+import com.google.zxing.EncodeHintType;
 import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.common.BitMatrix;
 
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
+import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
 import static com.visualstudio.m3l3m01t.myth.MainActivity.FragmentBarcode.KEY_BARCODE;
 import static com.visualstudio.m3l3m01t.myth.MainActivity.FragmentBarcode.KEY_BITMAP;
 
@@ -53,6 +65,7 @@ public class MainActivity extends WearableActivity {
     }
 
     GridViewPager mPager;
+    HashMap<String, Integer> mPermissions = new HashMap<>();
     private HashMap<String, List<Bitmap>> mBarcodeHash = new HashMap<>();
     Handler mHandler = new Handler() {
         @Override
@@ -66,10 +79,8 @@ public class MainActivity extends WearableActivity {
             }
         }
     };
-
     //    public static String mContentId = "29294117388747849490";
     private BoxInsetLayout mContainerView;
-    private TextView mClockView;
 //
 //    public static Fragment create(Bundle bundle, int row, int col) {
 //        if (row > mIdList.size()) {
@@ -109,17 +120,23 @@ public class MainActivity extends WearableActivity {
 //
 //        return null;
 //    }
+private TextView mClockView;
 
     public static Bitmap bitMatrixtoBitmap(DisplayMetrics metrics, BitMatrix matrix) {
-        int width = matrix.getWidth();
-        int height = matrix.getHeight();
+        int[] rect = matrix.getEnclosingRectangle();
+
+        int width = rect[2];
+        int height = rect[3];
 
         Bitmap bitmap = Bitmap.createBitmap(metrics,
-                width, height, Bitmap.Config.ARGB_4444);
+                width, height, Bitmap.Config.ARGB_8888);
 
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
-                bitmap.setPixel(x, y, matrix.get(x, y) ? Color.BLACK : Color.LTGRAY);
+                bitmap.setPixel(x, y,
+                        matrix.get(x + rect[0], y + rect[1]) ?
+                                Color.argb(0xff, 0x10, 0x10, 0x10) :
+                                Color.argb(0, 0xff, 0xff, 0xff));
             }
         }
 
@@ -130,9 +147,15 @@ public class MainActivity extends WearableActivity {
             height) {
         MultiFormatWriter writer = new MultiFormatWriter();
         try {
-            BitMatrix bitMatrix = writer.encode(s, format, width, height);
+            Map<EncodeHintType, String> hints = new HashMap<>();
 
-            return bitMatrixtoBitmap(displayMetrics, bitMatrix);
+            hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+
+            BitMatrix bitMatrix = writer.encode(s, format, width, height, hints);
+
+            Bitmap bitmap = bitMatrixtoBitmap(displayMetrics, bitMatrix);
+
+            return bitmap;
         } catch (Exception e) {
             e.printStackTrace();
 
@@ -140,39 +163,91 @@ public class MainActivity extends WearableActivity {
         }
     }
 
-    protected static List<Bitmap> createBarcodes(DisplayMetrics displayMetrics, String barcode) {
+    private static String getString(byte[] b) {
+        StringBuffer sb = new StringBuffer();
+        for (int i = 0; i < b.length; i++) {
+            sb.append(b[i]);
+        }
+        return sb.toString();
+    }
+
+    protected List<Bitmap> createBarcodes(DisplayMetrics displayMetrics, String barcode) {
         List<Bitmap> bitmaps = new Vector<>();
 
         for (Map.Entry<BarcodeFormat, Integer> entry :
                 mBarcodeDimension.entrySet()) {
-            int width;
+            String name = barcode + "_" + entry.getKey().name() + ".bmp";
 
-            int height;
 
-            if (entry.getValue() == 2) {
-                width = (int) (displayMetrics.xdpi * 5 / 6);
-                height = width;
-            } else {
-                width = (int) (displayMetrics.xdpi * 5 / 6);
+            int permissionCheck = ContextCompat.checkSelfPermission(this, READ_EXTERNAL_STORAGE);
 
-                height = width / 3;
+            if (PackageManager.PERMISSION_GRANTED == permissionCheck) {
+                String url = getPreferences(MODE_PRIVATE).getString(name, null);
+                if (url != null) {
+                    try {
+                        Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), Uri.parse(url));
+                        bitmaps.add(bitmap);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
+                    continue;
+                }
             }
 
-            Bitmap bitmap = createBarcode(displayMetrics, barcode, entry.getKey(), width, height);
-            if (bitmap != null)
-                bitmaps.add(bitmap);
+            {
+                int width, height;
+
+                if (entry.getValue() == 2) {
+                    width = (int) (displayMetrics.xdpi * 5 / 6);
+                    height = width;
+                } else {
+                    width = (int) (displayMetrics.xdpi * 5 / 6);
+
+                    height = width / 3;
+                }
+
+                Bitmap bitmap = createBarcode(displayMetrics, barcode, entry.getKey(), width, height);
+                if (bitmap != null) {
+                    bitmaps.add(bitmap);
+
+                    if (ContextCompat.checkSelfPermission(this, WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                        String url = MediaStore.Images.Media.insertImage(getContentResolver(), bitmap,
+                                name, barcode);
+
+                        if (url != null) {
+                            getPreferences(MODE_PRIVATE).edit().putString(name, url).commit();
+                        }
+                    }
+                }
+            }
         }
 
         return bitmaps;
     }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    protected void onPause() {
+        super.onPause();
+
+        mBarcodeHash.clear();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
 
         SharedPreferences preference = getPreferences(MODE_PRIVATE);
 
         Set<String> barcodes = preference.getStringSet("ID_SET", new HashSet<String>());
+        mPager.setAdapter(new MyPagerAdapter(getFragmentManager(), barcodes.toArray(new String[0])));
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
 
         setContentView(R.layout.activity_main);
         setAmbientEnabled();
@@ -181,9 +256,26 @@ public class MainActivity extends WearableActivity {
         mClockView = (TextView) findViewById(R.id.clock);
 
         mPager = (GridViewPager) findViewById(R.id.pager);
+
+        ActivityCompat.requestPermissions(
+                this, new String[]{READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE}, 0);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        for (int i = 0; i < permissions.length; i++) {
+            mPermissions.put(permissions[i], grantResults[i]);
+        }
+
+        SharedPreferences preference = getPreferences(MODE_PRIVATE);
+
+        Set<String> barcodes = preference.getStringSet("ID_SET", new HashSet<String>());
         mPager.setAdapter(new MyPagerAdapter(getFragmentManager(), barcodes.toArray(new String[0])));
     }
 
+    /*
     @Override
     public void onEnterAmbient(Bundle ambientDetails) {
         super.onEnterAmbient(ambientDetails);
@@ -201,21 +293,7 @@ public class MainActivity extends WearableActivity {
         updateDisplay();
         super.onExitAmbient();
     }
-
-/*    BroadcastReceiver receiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(ACTION_ADD)) {
-                String item = intent.getStringExtra("ITEM");
-
-                add(item);
-            } else if (intent.getAction().equals(ACTION_REMOVE)) {
-                String item = intent.getStringExtra("ITEM");
-
-                remove(item);
-            }
-        }
-    };*/
+*/
 
     private void updateDisplay() {
         if (isAmbient()) {
@@ -223,29 +301,13 @@ public class MainActivity extends WearableActivity {
             mClockView.setVisibility(View.VISIBLE);
 
             mClockView.setText(AMBIENT_DATE_FORMAT.format(new Date()));
+            mPager.invalidate();
         } else {
-            mContainerView.setBackground(null);
+//            mContainerView.setBackground(null);
+            mContainerView.setBackgroundColor(getResources().getColor(android.R.color.black));
             mClockView.setVisibility(View.GONE);
+            mPager.invalidate();
         }
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-
-
-//        IntentFilter filter = new IntentFilter(ACTION_REMOVE);
-//
-//        filter.addAction(ACTION_ADD);
-//        registerReceiver(receiver, filter);
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-
-        SharedPreferences preference = getPreferences(MODE_PRIVATE);
-        preference.edit().putStringSet("ID_SET", mBarcodeHash.keySet()).commit();
     }
 
     public void sendMessage(int arg1, String id) {
@@ -271,6 +333,9 @@ public class MainActivity extends WearableActivity {
         if (bitmaps.size() > 0) {
             mBarcodeHash.put(spokenText, bitmaps);
             mPager.setAdapter(new MyPagerAdapter(getFragmentManager(), mBarcodeHash.keySet().toArray(new String[0])));
+
+            SharedPreferences preference = getPreferences(MODE_PRIVATE);
+            preference.edit().putStringSet("ID_SET", mBarcodeHash.keySet()).commit();
         }
     }
 
@@ -280,6 +345,8 @@ public class MainActivity extends WearableActivity {
         mBarcodeHash.remove(spokenText);
 
         mPager.setAdapter(new MyPagerAdapter(getFragmentManager(), mBarcodeHash.keySet().toArray(new String[0])));
+        SharedPreferences preference = getPreferences(MODE_PRIVATE);
+        preference.edit().putStringSet("ID_SET", mBarcodeHash.keySet()).commit();
     }
 
     public static class FragmentBarcode extends Fragment {
@@ -296,15 +363,29 @@ public class MainActivity extends WearableActivity {
         public void onViewCreated(View view, Bundle savedInstanceState) {
             ImageView imageView = (ImageView) view.findViewById(R.id.imageView);
 
-            imageView.setImageBitmap(bitmap);
             imageView.setMaxHeight(bitmap.getHeight());
             imageView.setMaxWidth(bitmap.getWidth());
-            imageView.setScaleType(ImageView.ScaleType.CENTER);
+            imageView.setImageBitmap(bitmap);
 
             imageView.setOnLongClickListener(new View.OnLongClickListener() {
                 @Override
                 public boolean onLongClick(View v) {
-                    ((MainActivity) getActivity()).sendMessage(2, barcode);
+                    AlertDialog dialog = new AlertDialog.Builder(getContext())
+                            .setTitle("Delete?")
+                            .setMessage(barcode)
+                            .setNegativeButton(R.string.cancel, new OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    dialog.cancel();
+                                }
+                            }).setPositiveButton(R.string.confirm, new OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    ((MainActivity) getActivity()).sendMessage(2, barcode);
+                                }
+                            }).create();
+
+                    dialog.show();
                     return true;
                 }
             });
@@ -344,6 +425,7 @@ public class MainActivity extends WearableActivity {
                 @Override
                 public void onClick(View v) {
                     displaySpeechRecognizer();
+
                 }
             });
         }
@@ -351,9 +433,13 @@ public class MainActivity extends WearableActivity {
         // Create an intent that can start the Speech Recognizer activity
         void displaySpeechRecognizer() {
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+//            Intent intent = new Intent(RecognizerIntent.ACTION_VOICE_SEARCH_HANDS_FREE);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                     RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
             intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
+            intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+            intent.putExtra(RecognizerIntent.EXTRA_PROMPT, R.string.enter_speech);
+
 //            intent.putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, "en-US");
             // Start the activity, the intent will be populated with the speech text
             startActivityForResult(intent, SPEECH_REQUEST_CODE);
@@ -362,16 +448,34 @@ public class MainActivity extends WearableActivity {
         @Override
         public void onActivityResult(int requestCode, int resultCode, Intent data) {
             super.onActivityResult(requestCode, resultCode, data);
-            if (resultCode == RESULT_CANCELED)
+            if (resultCode != RESULT_OK)
                 return;
             if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK) {
                 List<String> results = data.getStringArrayListExtra(
                         RecognizerIntent.EXTRA_RESULTS);
-                for (String s : results) {
-//                String s = results.get(0);
+                final String s = results.get(0);
 
-                    ((MainActivity) getActivity()).sendMessage(1, s);
-                }
+                View layout = LayoutInflater.from(getContext()).inflate(R.layout.layout_confirm, null);
+                TextView textView = ((TextView) layout.findViewById(R.id.textMessage));
+
+                textView.setText(s);
+
+                AlertDialog dialog = new AlertDialog.Builder(getContext())
+                        .setTitle("Add Barcode")
+                        .setView(layout)
+                        .setNegativeButton(R.string.cancel, new OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                dialog.cancel();
+                            }
+                        }).setPositiveButton(R.string.confirm, new OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                ((MainActivity) getActivity()).sendMessage(1, s);
+                            }
+                        }).create();
+
+                dialog.show();
             }
         }
     }

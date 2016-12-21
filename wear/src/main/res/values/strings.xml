@@ -1,4 +1,8 @@
 <resources>
     <string name="app_name">Myth</string>
     <string name="hello_world">Hello World!</string>
+    <string name="enter_speech">Speak!</string>
+    <string name="create_barcode">Create barcode</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Confirm</string>
 </resources>
